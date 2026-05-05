@@ -1,0 +1,11 @@
+dataset,algorithm,time_seconds,status
+small_10000,bubble,{T_BS_SMALL},ok
+small_10000,selection,{T_SS_SMALL},ok
+small_10000,insertion,{T_IS_SMALL},ok
+small_10000,merge,{T_MS_SMALL},ok
+small_10000,quick,{T_QS_SMALL},ok
+large_20000000,bubble,{T_BS_LARGE},timeout_or_ok
+large_20000000,selection,{T_SS_LARGE},timeout_or_ok
+large_20000000,insertion,{T_IS_LARGE},timeout_or_ok
+large_20000000,merge,{T_MS_LARGE},ok
+large_20000000,quick,{T_QS_LARGE},ok

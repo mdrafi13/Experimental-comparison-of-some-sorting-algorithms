@@ -3,6 +3,8 @@
 #include <vector>
 #include <chrono>
 #include <future>       // for async and future (for timeout)
+#include <string>
+#include <functional>
 #include "data.h"
 
 namespace fs = std::filesystem;
@@ -127,41 +129,112 @@ double timeSortWithTimeout(Func sortFunc, std::vector<int> data, const std::stri
     }
 }
 
+struct DatasetSpec {
+    std::string name;
+    std::string smallFile;
+    std::string largeFile;
+    std::function<void(const std::string&, size_t)> smallGenerator;
+    std::function<void(const std::string&, size_t)> largeGenerator;
+};
+
+void runAllSortsOnDataset(const std::vector<int>& data, const std::string& datasetLabel, bool useTimeoutForQuadratic) {
+    std::cout << "=== " << datasetLabel << " (" << data.size() << " numbers) ===\n";
+
+    double timeout = useTimeoutForQuadratic ? 40.0 : 0.0;
+    timeSortWithTimeout(insertionSort, data, "Insertion Sort", datasetLabel, timeout);
+    timeSortWithTimeout(selectionSort, data, "Selection Sort", datasetLabel, timeout);
+    timeSortWithTimeout(bubbleSort, data, "Bubble Sort", datasetLabel, timeout);
+    timeSortWithTimeout(mergeSort, data, "Merge Sort", datasetLabel);
+    timeSortWithTimeout(quickSort, data, "Quick Sort", datasetLabel);
+}
+
 // ------------------------
 // Main function
 // ------------------------
 int main() {
+    const size_t smallSize = 10000;
+    const size_t largeSize = 20000000;
+    const int minVal = 1;
+    const int maxVal = 20000000;
+
+    std::vector<DatasetSpec> datasets = {
+        {
+            "random",
+            "small_random_data.txt",
+            "large_random_data.txt",
+            [minVal, maxVal](const std::string& file, size_t size) { generateDataset(file, size, minVal, maxVal); },
+            [minVal, maxVal](const std::string& file, size_t size) { generateDataset(file, size, minVal, maxVal); }
+        },
+        {
+            "sorted",
+            "small_sorted_data.txt",
+            "large_sorted_data.txt",
+            [](const std::string& file, size_t size) { generateSortedDataset(file, size); },
+            [](const std::string& file, size_t size) { generateSortedDataset(file, size); }
+        },
+        {
+            "reverse_sorted",
+            "small_reverse_sorted_data.txt",
+            "large_reverse_sorted_data.txt",
+            [](const std::string& file, size_t size) { generateReverseSortedDataset(file, size); },
+            [](const std::string& file, size_t size) { generateReverseSortedDataset(file, size); }
+        },
+        {
+            "almost_sorted",
+            "small_almost_sorted_data.txt",
+            "large_almost_sorted_data.txt",
+            [minVal, maxVal](const std::string& file, size_t size) {
+                generateAlmostSortedDataset(file, size, minVal, maxVal, 0.02);
+            },
+            [minVal, maxVal](const std::string& file, size_t size) {
+                generateAlmostSortedDataset(file, size, minVal, maxVal, 0.02);
+            }
+        },
+        {
+            "half_sorted",
+            "small_half_sorted_data.txt",
+            "large_half_sorted_data.txt",
+            [minVal, maxVal](const std::string& file, size_t size) { generateHalfSortedDataset(file, size, minVal, maxVal); },
+            [minVal, maxVal](const std::string& file, size_t size) { generateHalfSortedDataset(file, size, minVal, maxVal); }
+        },
+        {
+            "flat",
+            "small_flat_data.txt",
+            "large_flat_data.txt",
+            [](const std::string& file, size_t size) { generateFlatDataset(file, size, 10); },
+            [](const std::string& file, size_t size) { generateFlatDataset(file, size, 10); }
+        },
+        {
+            "few_unique",
+            "small_few_unique_data.txt",
+            "large_few_unique_data.txt",
+            [minVal, maxVal](const std::string& file, size_t size) { generateFewUniqueDataset(file, size, minVal, maxVal, 5); },
+            [minVal, maxVal](const std::string& file, size_t size) { generateFewUniqueDataset(file, size, minVal, maxVal, 5); }
+        }
+    };
+
     // ------------------------
     // Generate datasets if not exist
     // ------------------------
-    if (!fs::exists("large_data.txt")) generateDataset("large_data.txt", 20000000, 1, 20000000);
-    if (!fs::exists("small_data.txt")) generateDataset("small_data.txt", 10000, 1, 20000000);
+    for (const auto& spec : datasets) {
+        if (!fs::exists(spec.smallFile)) {
+            spec.smallGenerator(spec.smallFile, smallSize);
+        }
+        if (!fs::exists(spec.largeFile)) {
+            spec.largeGenerator(spec.largeFile, largeSize);
+        }
+    }
 
     // ------------------------
-    // Read datasets
+    // Run all algorithms on all dataset types
     // ------------------------
-    std::vector<int> largeData = readDataset("large_data.txt");
-    std::vector<int> smallData = readDataset("small_data.txt");
+    for (const auto& spec : datasets) {
+        std::vector<int> smallData = readDataset(spec.smallFile);
+        std::vector<int> largeData = readDataset(spec.largeFile);
 
-    // ------------------------
-    // Small dataset
-    // ------------------------
-    std::cout << "=== Small dataset (10,000 numbers) ===\n";
-    timeSortWithTimeout(bubbleSort, smallData, "Bubble Sort", "small dataset");
-    timeSortWithTimeout(selectionSort, smallData, "Selection Sort", "small dataset");
-    timeSortWithTimeout(insertionSort, smallData, "Insertion Sort", "small dataset");
-    timeSortWithTimeout(mergeSort, smallData, "Merge Sort", "small dataset");
-    timeSortWithTimeout(quickSort, smallData, "Quick Sort", "small dataset");
-
-    // ------------------------
-    // Large dataset
-    // ------------------------
-    std::cout << "=== Large dataset (20,000,000 numbers) ===\n";
-    timeSortWithTimeout(insertionSort, largeData, "Insertion Sort", "large dataset", 40);
-    timeSortWithTimeout(selectionSort, largeData, "Selection Sort", "large dataset", 40);
-    timeSortWithTimeout(bubbleSort, largeData, "Bubble Sort", "large dataset", 40);
-    timeSortWithTimeout(mergeSort, largeData, "Merge Sort", "large dataset");
-    timeSortWithTimeout(quickSort, largeData, "Quick Sort", "large dataset");
+        runAllSortsOnDataset(smallData, "small " + spec.name + " dataset", false);
+        runAllSortsOnDataset(largeData, "large " + spec.name + " dataset", true);
+    }
 
     return 0;
 }
